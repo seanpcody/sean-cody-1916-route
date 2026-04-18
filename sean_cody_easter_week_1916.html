@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Seán Cody — Easter Week 1916</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=EB+Garamond:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --ink: #1a1208;
+    --parchment: #f5eed8;
+    --aged: #e8dfc0;
+    --sepia: #8b6914;
+    --deep-sepia: #5c440d;
+    --red: #8b1a1a;
+    --fade: #b8a882;
+    --border: #c4a85a;
+  }
+
+  body {
+    font-family: 'EB Garamond', Georgia, serif;
+    background: var(--parchment);
+    color: var(--ink);
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  .layout {
+    display: grid;
+    grid-template-columns: 400px 1fr;
+    grid-template-rows: auto 1fr;
+    height: 100vh;
+  }
+
+  .header {
+    grid-column: 1 / -1;
+    background: var(--ink);
+    color: var(--parchment);
+    padding: 14px 28px;
+    display: flex;
+    align-items: baseline;
+    gap: 20px;
+    border-bottom: 3px solid var(--border);
+    flex-wrap: wrap;
+  }
+
+  .header h1 {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 1.3rem;
+    font-weight: 700;
+  }
+
+  .header .subtitle {
+    font-style: italic;
+    font-size: 0.95rem;
+    color: var(--fade);
+    flex: 1;
+  }
+
+  .header .doc-ref {
+    font-size: 0.72rem;
+    color: var(--border);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  /* SIDEBAR */
+  .sidebar {
+    background: var(--aged);
+    border-right: 2px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .stop-counter {
+    padding: 18px 22px 14px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+  }
+
+  .stop-num {
+    font-family: 'Playfair Display', serif;
+    font-size: 2.8rem;
+    font-weight: 700;
+    color: var(--deep-sepia);
+    line-height: 1;
+    min-width: 58px;
+  }
+
+  .stop-meta { flex: 1; }
+
+  .stop-day {
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--sepia);
+    margin-bottom: 3px;
+  }
+
+  .stop-name {
+    font-family: 'Playfair Display', serif;
+    font-size: 1rem;
+    font-weight: 700;
+    line-height: 1.25;
+  }
+
+  .stop-notes {
+    padding: 16px 22px;
+    flex: 1;
+    overflow-y: auto;
+    min-height: 0;
+  }
+
+  .notes-label {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--sepia);
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .notes-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+    opacity: 0.6;
+  }
+
+  .notes-text {
+    font-size: 1.02rem;
+    line-height: 1.8;
+    font-style: italic;
+  }
+
+  .progress-track {
+    padding: 12px 22px;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .progress-bar-bg {
+    height: 4px;
+    background: rgba(139,105,20,0.2);
+    border-radius: 2px;
+    margin-bottom: 6px;
+  }
+
+  .progress-bar-fill {
+    height: 100%;
+    background: var(--sepia);
+    border-radius: 2px;
+    transition: width 0.4s ease;
+  }
+
+  .progress-label {
+    font-size: 0.7rem;
+    color: var(--fade);
+    letter-spacing: 0.06em;
+  }
+
+  .stop-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 6px 0;
+    min-height: 0;
+  }
+
+  .stop-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 22px;
+    cursor: pointer;
+    border-left: 3px solid transparent;
+    transition: background 0.15s;
+  }
+
+  .stop-item:hover { background: rgba(139,105,20,0.08); }
+  .stop-item.active { background: rgba(139,105,20,0.14); border-left-color: var(--sepia); }
+
+  .item-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--fade);
+    flex-shrink: 0;
+    transition: background 0.2s;
+  }
+
+  .stop-item.visited .item-dot { background: var(--sepia); }
+  .stop-item.active .item-dot {
+    background: var(--red);
+    box-shadow: 0 0 0 3px rgba(139,26,26,0.2);
+  }
+
+  .item-num {
+    font-family: 'Playfair Display', serif;
+    font-size: 0.7rem;
+    color: var(--sepia);
+    min-width: 18px;
+    font-weight: 700;
+  }
+
+  .item-name {
+    font-size: 0.8rem;
+    line-height: 1.3;
+    opacity: 0.8;
+  }
+
+  .stop-item.active .item-name { opacity: 1; font-weight: 500; }
+
+  .nav-controls {
+    padding: 14px 22px;
+    display: flex;
+    gap: 10px;
+    border-top: 2px solid var(--border);
+    background: var(--ink);
+    flex-shrink: 0;
+  }
+
+  .nav-btn {
+    flex: 1;
+    padding: 10px 14px;
+    font-family: 'EB Garamond', serif;
+    font-size: 0.88rem;
+    letter-spacing: 0.06em;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    text-transform: uppercase;
+    transition: all 0.2s;
+    background: transparent;
+  }
+
+  .nav-btn.prev { background: transparent; color: var(--fade); }
+  .nav-btn.prev:hover:not(:disabled) { background: rgba(196,168,90,0.1); color: var(--parchment); }
+  .nav-btn.next { background: var(--sepia); color: var(--parchment); border-color: var(--sepia); }
+  .nav-btn.next:hover:not(:disabled) { background: var(--deep-sepia); }
+  .nav-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+  .map-panel { position: relative; }
+  #map { width: 100%; height: 100%; }
+
+  .leaflet-marker-icon { border: none !important; background: none !important; }
+
+  .marker-pin {
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: Georgia, serif;
+    font-weight: 700;
+    color: white;
+    border: 2px solid white;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+    cursor: pointer;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .fade-in { animation: fadeIn 0.3s ease; }
+
+  .stop-list::-webkit-scrollbar,
+  .stop-notes::-webkit-scrollbar { width: 4px; }
+  .stop-list::-webkit-scrollbar-thumb,
+  .stop-notes::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .tile-control {
+    position: absolute;
+    bottom: 20px;
+    right: 10px;
+    z-index: 1000;
+    background: rgba(26,18,8,0.9);
+    padding: 8px 14px;
+    border-radius: 20px;
+    font-size: 0.7rem;
+    font-family: monospace;
+    color: var(--border);
+    backdrop-filter: blur(4px);
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+
+<div class="layout">
+
+  <header class="header">
+    <h1>Seán Cody — Easter Week 1916</h1>
+    <span class="subtitle">A route through Dublin from his witness statement</span>
+    <span class="doc-ref">Bureau of Military History · W.S. 1035</span>
+  </header>
+
+  <aside class="sidebar">
+
+    <div class="stop-counter">
+      <div class="stop-num" id="currentNum">00</div>
+      <div class="stop-meta">
+        <div class="stop-day" id="currentDay"></div>
+        <div class="stop-name" id="currentName"></div>
+      </div>
+    </div>
+
+    <div class="stop-notes">
+      <div class="notes-label">Witness account</div>
+      <div class="notes-text" id="currentNotes"></div>
+    </div>
+
+    <div class="progress-track">
+      <div class="progress-bar-bg">
+        <div class="progress-bar-fill" id="progressBar" style="width:0%"></div>
+      </div>
+      <div class="progress-label" id="progressLabel">Stop 0 of 15</div>
+    </div>
+
+    <div class="stop-list" id="stopList"></div>
+
+    <div class="nav-controls">
+      <button class="nav-btn prev" id="prevBtn" disabled>← Previous</button>
+      <button class="nav-btn next" id="nextBtn">Next →</button>
+    </div>
+
+  </aside>
+
+  <div class="map-panel">
+    <div id="map"></div>
+    <div class="tile-control" id="tileStatus">🗺️ Loading map...</div>
+  </div>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+const stops = [
+  { num:0,  name:"Fairview",                                              day:"Easter Sunday — starting point",   lat:53.3628177, lng:-6.2398252, notes:"Cody sets out from Fairview on Easter Sunday morning, heading into the city after waiting at home in uniform all morning for orders that never came." },
+  { num:1,  name:"Pro-Cathedral, Marlborough St",                         day:"Easter Sunday, 11.30am",           lat:53.3509518, lng:-6.2588538, notes:"Attends 11.30 Mass, kneels beside Seán MacDiarmada. Fr. Flanagan tells him to go home and take off his uniform. Instead, he heads toward Parnell Square." },
+  { num:2,  name:"HQ, Blackhall Street",                                  day:"Good Friday / Easter Monday",      lat:53.3485382, lng:-6.2814103, notes:"Good Friday night: Cody and G Company members are based here, taking parcels to various addresses across the city. Easter Monday: word is left that he must report here to mobilise." },
+  { num:3,  name:"North Strand Road",                                     day:"Easter Monday morning",            lat:53.3575840, lng:-6.2426667, notes:"Easter Monday: Cody walks down North Strand, joined by Volunteer Seán Óg Ó'Ceallaigh, who accompanies him as far as Liberty Hall." },
+  { num:4,  name:"Liberty Hall, Eden Quay",                               day:"Easter Monday, before noon",       lat:53.3484728, lng:-6.2556986, notes:"The Citizen Army are lined up in deep formation. James Connolly and Countess Markievicz are being photographed on the steps. Cody sees Tom Ennis driving a horse-drawn cart loaded with ammunition boxes." },
+  { num:5,  name:"St Paul's Church, Arran Quay",                          day:"Easter Monday, en route",          lat:53.3464134, lng:-6.2778498, notes:"Cody cuts off the Quays here and takes a side street heading north toward Father Mathew Hall, to avoid Lancers escorting war material from the North Wall." },
+  { num:6,  name:"Father Mathew Hall, Church St (1st Bn HQ)",             day:"Easter Monday, just before noon",  lat:53.3494298, lng:-6.2749072, notes:"The 1st Battalion assembles just before noon. Commandant Ned Daly and Lt. Laffan are present. G Company falls in. This later becomes the Battalion HQ." },
+  { num:7,  name:"Queen Street",                                           day:"Easter Monday",                    lat:53.3488724, lng:-6.2796062, notes:"The Battalion marches up Queen Street on the way to their operational positions." },
+  { num:8,  name:"North Brunswick St — Doyle's Coach Factory (G Coy HQ)", day:"Easter Monday",                    lat:53.3505324, lng:-6.2780319, notes:"The Battalion is halted here. Sentries are posted. G Company's headquarters is established at Doyle's Coach Factory at the junction of Upper Church St and North Brunswick St." },
+  { num:9,  name:"North Dublin Union",                                     day:"Early in the week",                lat:53.3520459, lng:-6.2758918, notes:"A British cavalry soldier, captured by Cody while attempting to cross their lines, is detained here and made to do fatigue duty for the Irish Republican Army." },
+  { num:10, name:"Linen Hall Barracks (site), Lisburn St",                 day:"Early in the week",                lat:53.3528000, lng:-6.2745000, notes:"British-occupied barracks. G Company attacked and captured it. The barracks were burned — so fiercely it was necessary to hose down adjoining tenements. Snipers in the King's Inns fired on the volunteers during the operation." },
+  { num:11, name:"Broadstone Station, Constitution Hill",                  day:"Mid-week",                         lat:53.3540614, lng:-6.2733438, notes:"G Company attacked with just 12 men to delay British reinforcements arriving from Athlone. A fierce firefight — outnumbered at least 20 to 1. They withdrew after about ten minutes with one Volunteer wounded." },
+  { num:12, name:"North King Street — Reilly's Fort",                      day:"Thursday–Friday",                  lat:53.3499200, lng:-6.2759712, notes:"The scene of the most intense fighting of the week. The British advanced up from Bolton St supported by two armoured cars. Paddy Holohan led a fierce defence. Reilly's pub — 'the Fort' — was a key strongpoint. The Howth Mauser rifles did great work here." },
+  { num:13, name:"Church Street — main operational area",                  day:"Throughout the week",              lat:53.3494000, lng:-6.2749000, notes:"G Company's main area of operations throughout the entire week. Barricades were erected, positions loop-holed. It was here on Easter Monday that the Lancers were fired upon, opening the fighting." },
+  { num:14, name:"Surrender point, Church St / North Brunswick St",        day:"Saturday morning",                 lat:53.3505300, lng:-6.2760000, notes:"Fathers Albert and Augustine arrive under a white flag with a British officer. A written surrender order from P.H. Pearse is produced and verified. About 37 men and 3 officers surrender, managing to hand most of their arms to friends first." },
+  { num:15, name:"Dublin Castle",                                           day:"Saturday afternoon",               lat:53.3428861, lng:-6.2674284, notes:"The prisoners are marched under heavy escort: North King St → Capel St → Dublin Castle, where they are held for four hours before being taken to a barracks on the South Circular Road. G Company of the 1st Battalion was the last to surrender." },
+];
+
+let currentStop = 0;
+let markers = [];
+
+const map = L.map('map').setView([53.352, -6.268], 15);
+
+// Multiple tile layer options with proper attribution and working without referrer issues
+// Using CartoDB Voyager (beautiful, works without referrer blocks)
+const tileLayers = {
+  voyager: L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+    subdomains: 'abcd',
+    maxZoom: 19,
+    minZoom: 12
+  }),
+  dark_matter: L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+    subdomains: 'abcd',
+    maxZoom: 19
+  }),
+  // OpenStreetMap standard (using different URL that might work better)
+  osm: L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    maxZoom: 19
+  }),
+  // Humanitarian style
+  hot: L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> | Humanitarian',
+    maxZoom: 19
+  })
+};
+
+// Add voyager as default (most reliable and beautiful)
+const currentTile = tileLayers.voyager;
+currentTile.addTo(map);
+
+// Update status message
+document.getElementById('tileStatus').innerHTML = '🗺️ CartoDB Voyager map active — <span style="color:#c4a85a">Route of G Company 1916</span>';
+
+// Route polyline
+L.polyline(stops.map(s => [s.lat, s.lng]), {
+  color: '#8b6914', weight: 2.5, opacity: 0.55, dashArray: '6,6'
+}).addTo(map);
+
+function makeIcon(num, state) {
+  const size  = state === 'current' ? 34 : 28;
+  const bg    = state === 'current' ? '#8b1a1a' : state === 'visited' ? '#8b6914' : '#b8a882';
+  const fs    = state === 'current' ? 13 : 11;
+  const bw    = state === 'current' ? 3 : 2;
+  return L.divIcon({
+    html: `<div class="marker-pin" style="width:${size}px;height:${size}px;background:${bg};font-size:${fs}px;border-width:${bw}px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:bold;color:white;border:${bw}px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.4);">${num}</div>`,
+    className: '',
+    iconSize: [size, size],
+    iconAnchor: [size/2, size/2],
+  });
+}
+
+stops.forEach((stop, i) => {
+  const marker = L.marker([stop.lat, stop.lng], {
+    icon: makeIcon(stop.num, 'unvisited'),
+    title: stop.name,
+  }).addTo(map);
+  marker.on('click', () => goTo(i));
+  markers.push(marker);
+});
+
+// Build stop list
+const list = document.getElementById('stopList');
+stops.forEach((stop, i) => {
+  const item = document.createElement('div');
+  item.className = 'stop-item';
+  item.id = `item-${i}`;
+  item.innerHTML = `
+    <div class="item-dot"></div>
+    <div class="item-num">${String(stop.num).padStart(2,'0')}</div>
+    <div class="item-name">${stop.name}</div>
+  `;
+  item.addEventListener('click', () => goTo(i));
+  list.appendChild(item);
+});
+
+function goTo(index) {
+  if (index < 0 || index >= stops.length) return;
+  currentStop = index;
+  const stop = stops[index];
+
+  document.getElementById('currentNum').textContent  = String(stop.num).padStart(2,'0');
+  document.getElementById('currentDay').textContent  = stop.day;
+  document.getElementById('currentName').textContent = stop.name;
+
+  const notesEl = document.getElementById('currentNotes');
+  notesEl.textContent = stop.notes;
+  notesEl.classList.remove('fade-in');
+  void notesEl.offsetWidth;
+  notesEl.classList.add('fade-in');
+
+  document.getElementById('progressBar').style.width = ((index / (stops.length-1)) * 100) + '%';
+  document.getElementById('progressLabel').textContent = `Stop ${index} of ${stops.length - 1}`;
+
+  const prevBtn = document.getElementById('prevBtn');
+  const nextBtn = document.getElementById('nextBtn');
+  prevBtn.disabled = index === 0;
+  nextBtn.disabled = index === stops.length - 1;
+  nextBtn.textContent = index === stops.length - 1 ? 'End of route' : 'Next →';
+  
+  // Remove old listeners and add new ones
+  prevBtn.onclick = () => goTo(currentStop - 1);
+  nextBtn.onclick = () => goTo(currentStop + 1);
+
+  document.querySelectorAll('.stop-item').forEach((el, i) => {
+    el.classList.toggle('active', i === index);
+    el.classList.toggle('visited', i < index);
+  });
+  document.getElementById(`item-${index}`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+
+  stops.forEach((_, i) => {
+    const state = i === index ? 'current' : i < index ? 'visited' : 'unvisited';
+    markers[i].setIcon(makeIcon(stops[i].num, state));
+  });
+
+  map.setView([stop.lat, stop.lng], 16, { animate: true });
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowRight' || e.key === 'ArrowDown') goTo(currentStop + 1);
+  if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')   goTo(currentStop - 1);
+});
+
+goTo(0);
+</script>
+</body>
+</html>
